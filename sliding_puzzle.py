@@ -64,9 +64,12 @@ class LevelSelector:
     """The level selector scene."""
 
     IMAGES = [
-        "puzzles/pygame.png",
-        "puzzles/pygame0.png",
-        "puzzles/pygame1.png",
+        "puzzles/deepelf.png",
+        "puzzles/demilich.png",
+        "puzzles/dragonwhelp.png",
+        "puzzles/fireelemental.png",
+        "puzzles/goblinrunts.png",
+        "puzzles/goblin.png",
     ]
 
     def __init__(self, on_select):
