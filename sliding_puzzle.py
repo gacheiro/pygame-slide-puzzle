@@ -78,6 +78,7 @@ class LevelSelector:
         self._images = []
         for image in self.IMAGES:
             self._images.append(load_puzzle_image(image, image_size=(200, 200)))
+        self._select = pygame.image.load("select.png").convert_alpha()
 
     def prev(self):
         """Slide to the previous image."""
@@ -124,8 +125,9 @@ class LevelSelector:
         for level, p in zip(levels, pos):
             if level is not None:
                 surface.blit(level, p)
-        # Draws a white border around the current image
+        # Draws a white border around the current image and the `select puzzle` image
         pygame.draw.rect(surface, (255, 255, 255), (90, 104, 220, 220), 3)
+        surface.blit(self._select, (127, 40))
 
 
 class Puzzle:
