@@ -1,3 +1,5 @@
+__version__ = "0.2.dev"
+
 from random import choice
 
 import pygame
@@ -6,49 +8,45 @@ import pygame
 class Game:
     """The game class."""
 
-    def __init__(self, width, height, puzzle_image,
-                 game_rect=(0, 0, 328, 328)):
+    def __init__(self, width, height, game_rect=(0, 0, 328, 328)):
         # Init the display
         self.width, self.height = width, height
+        self.game_rect = game_rect
         self.screen = pygame.display.set_mode((self.width, self.height))
         pygame.display.set_caption('Pygame Sliding Puzzle')
-        # Creates the game board
-        self.puzzle = make_puzzle(puzzle_image, game_rect)
-        self.running = False
-
-    def start(self):
-        """Starts the game and shuffles the game board."""
-        self.puzzle.shuffle(moves=150)
+        # Creates the level selector
+        self.level_selector = LevelSelector(on_select=self.start)
+        # Marks the game as running, but level was not selected yet
         self.running = True
+        self.started = False
+
+    def start(self, image_path):
+        """Starts the game, loads and shuffles the image."""
+        self.puzzle = make_puzzle(image_path, self.game_rect)
+        self.puzzle.shuffle(moves=150)
+        self.started = True
 
     def update(self):
-        """Processes input events and updates the board."""
+        """Processes input events and updates the game."""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                self.quit()
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_UP:
-                self.puzzle.move('up')
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_RIGHT:
-                self.puzzle.move('right')
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_DOWN:
-                self.puzzle.move('down')
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_LEFT:
-                self.puzzle.move('left')
+                pygame.quit()
+                quit()
+            elif event.type != pygame.KEYDOWN:
+                continue
+            # Pass the control to the level selector if game is not started
+            if not self.started:
+                self.level_selector.update(event)
+            else:
+                self.puzzle.update(event)
 
     def draw(self):
-        """Draws the game puzzle."""
+        """Draws either the level selector or the game puzzle."""
         surface = self.screen
-        self.puzzle.draw(surface)
-        # Draws a white border around the image puzzle
-        brect = self.puzzle.rect
-        inflated_brect = brect.inflate(int(brect.width * 0.05),
-                                       int(brect.height * 0.05))
-        pygame.draw.rect(surface, (255, 255, 255), inflated_brect, 3)
-
-
-    def quit(self):
-        """Makes the game exit in the next loop."""
-        self.running = False
+        if not self.started:
+            self.level_selector.draw(surface)
+        else:
+            self.puzzle.draw(surface)
 
     def game_loop(self):
         """Performs the game loop: process input, update screen etc."""
@@ -62,7 +60,72 @@ class Game:
         pygame.quit()
 
 
-class Puzzle(object):
+class LevelSelector:
+    """The level selector scene."""
+
+    IMAGES = [
+        "puzzles/pygame.png",
+        "puzzles/pygame0.png",
+        "puzzles/pygame1.png",
+    ]
+
+    def __init__(self, on_select):
+        self.on_select = on_select # Callback to start the game
+        self._level = 0
+        self._images = []
+        for image in self.IMAGES:
+            self._images.append(load_puzzle_image(image, image_size=(200, 200)))
+
+    def prev(self):
+        """Slide to the previous image."""
+        if self._level > 0:
+            self._level -= 1
+
+    def next(self):
+        """Slide to the next image."""
+        if self._level < len(self._images) - 1:
+            self._level += 1
+
+    def _current_puzzle(self):
+        """Returns the image for the current level."""
+        return self._images[self._level]
+
+    def _prev_puzzle(self):
+        """Returns the image for the previous level (if exists)."""
+        if self._level > 0:
+            return self._images[self._level - 1]
+
+    def _next_puzzle(self):
+        """Returns the image for the next level (if exists)."""
+        if self._level < len(self._images) - 1:
+            return self._images[self._level + 1]
+
+    def update(self, event):
+        """Processes user's input."""
+        if event.type != pygame.KEYDOWN:
+            return
+        elif event.key == pygame.K_LEFT:
+            self.prev()
+        elif event.key == pygame.K_RIGHT:
+            self.next()
+        elif event.key == pygame.K_RETURN:
+            self.on_select(self.IMAGES[self._level])
+
+    def draw(self, surface):
+        """Draws current state."""
+        pos = ((-150, 100), (100, 114), (350, 100))
+        levels = (self._prev_puzzle(),
+                  self._current_puzzle(),
+                  self._next_puzzle())
+        # Draws the images at the predefined positions
+        for level, p in zip(levels, pos):
+            if level is not None:
+                surface.blit(level, p)
+        # Draws a white border around the current image
+        pygame.draw.rect(surface, (255, 255, 255), (90, 104, 220, 220), 3)
+
+
+class Puzzle:
     """The puzzle object."""
 
     def __init__(self, x, y, image_pieces):
@@ -75,6 +138,19 @@ class Puzzle(object):
         for s in self.image_pieces:
             rect.union_ip(s.rect)
         return rect
+
+    def update(self, event):
+        """Processes user's input."""
+        if event.type != pygame.KEYDOWN:
+            return
+        elif event.key == pygame.K_UP:
+            self.move('up')
+        elif event.key == pygame.K_RIGHT:
+            self.move('right')
+        elif event.key == pygame.K_DOWN:
+            self.move('down')
+        elif event.key == pygame.K_LEFT:
+            self.move('left')
 
     def move(self, direction):
         """Move an image piece in the given direction. Possible directions
@@ -93,7 +169,6 @@ class Puzzle(object):
         is_valid = board_rect.colliderect
         # The current state of the puzzle
         current_pos = set((s.x, s.y) for s in self.image_pieces)
-
         # Searchs sequentially for the only peice that can be moved
         # to the given direction
         for piece in self.image_pieces:
@@ -109,18 +184,19 @@ class Puzzle(object):
         for _ in range(moves):
             m = choice(('up', 'right', 'down', 'left'))
             self.move(m)
-        # Makes sure the empty space is at the botton-right corner
+        # Makes sure the blank space is at the botton-right corner
         self.move('left'), self.move('left'), self.move('left')
         self.move('up'), self.move('up'), self.move('up')
-
-    def is_solved(self):
-        """Returns True if the game is solved."""
-        return all(s.start_pos == (s.x, s.y) for s in self)
 
     def draw(self, surface):
         """Draw the image pieces on the surface."""
         for subsurf in self.image_pieces:
             surface.blit(subsurf.image, (subsurf.x, subsurf.y))
+        # Draws a white border around the image
+        brect = self.rect
+        inflated_brect = brect.inflate(int(brect.width * 0.05),
+                                       int(brect.height * 0.05))
+        pygame.draw.rect(surface, (255, 255, 255), inflated_brect, 3)
 
 
 class ImagePiece(pygame.sprite.Sprite):
@@ -186,8 +262,6 @@ if __name__ == '__main__':
     game = Game(
         width=400,
         height=428,
-        puzzle_image='pygame-badge.png',
         game_rect=(36, 50, 328, 328)
     )
-    game.start()
     game.game_loop()
