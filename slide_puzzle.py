@@ -1,4 +1,4 @@
-__version__ = "0.2"
+__version__ = "0.3"
 
 from random import choice
 
@@ -13,7 +13,7 @@ class Game:
         self.width, self.height = width, height
         self.game_rect = game_rect
         self.screen = pygame.display.set_mode((self.width, self.height))
-        pygame.display.set_caption('Pygame Sliding Puzzle')
+        pygame.display.set_caption('Pygame Slide Puzzle')
         # Creates the level selector
         self.level_selector = LevelSelector(on_select=self.start)
         # Marks the game as running, but level was not selected yet
